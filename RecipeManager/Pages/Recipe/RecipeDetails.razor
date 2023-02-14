@@ -1,0 +1,100 @@
+﻿@page "/recipe/details/{Id:int}"
+@page "/recipe/create"
+
+@using DataAccess.Models
+@using RecipeManager.Pages.Components
+@using Services
+
+@inject IRecipeService RecipeService
+@inject IToastService ToastService
+@inject NavigationManager NavigationManager
+
+<div class="container d-flex justify-content-center m-0 p-0">
+    <EditForm Model="@Recipe" OnValidSubmit="@HandleOnValidSubmit" class="col-sm-12 col-md-10 col-lg-8 p-0">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="form-group">
+            <label for="title">Title</label>
+            <InputText id="title" @bind-Value="@Recipe.Title" class="form-control" placeholder="Green curry..." />
+        </div>
+
+        <div class="form-group">
+            <label for="description">Description</label>
+            <InputTextArea id="description" @bind-Value="@Recipe.Description" class="form-control" placeholder="Placeholder text..." rows="5" />
+        </div>
+
+        <div class="form-group">
+            <button type="submit" class="btn btn-sm btn-primary mt-3" hidden="@(Id == null)"><i class="fas fa-save pe-2"></i>Save</button>
+            <button type="submit" class="btn btn-sm btn-success mt-3" hidden="@(Id != null)"><i class="fas fa-plus pe-2"></i>Create</button>
+            <a href="/recipes" type="submit" class="btn btn-sm btn-secondary mt-3"><i class="fas fa-times pe-2"></i>Cancel</a>
+            <button type="button" class="btn btn-sm btn-danger mt-3 float-end" hidden="@(Id == null)" @onclick="(async () => await ShowConfirmationModal())">
+                <i class="fas fa-trash pe-2"></i>Delete</button>
+        </div>
+
+        @if(Id != null)
+        {
+            <hr />
+            <label>Created on: @Recipe.DateCreated</label> <br />
+            <label>Updated on: @Recipe.DateUpdated</label>
+        }
+        
+    </EditForm>
+</div>
+
+
+
+@code {
+    [Parameter]
+    public int? Id { get; set; }
+
+    public Recipe Recipe = new Recipe();
+
+    [CascadingParameter] IModalService Modal { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if(Id != null) 
+        {
+            Recipe = RecipeService.Get(Id.Value);
+        }
+    }
+
+    private void HandleOnValidSubmit()
+    {
+        try
+        {
+            if(Id != null)
+            {
+                RecipeService.Update(Recipe);
+            }
+            else
+            {
+                Recipe newRecipe = RecipeService.Create(Recipe);
+                NavigationManager.NavigateTo($"/recipe/details/{newRecipe.Id}");
+            }
+
+            ToastService.ShowSuccess("Your recipe has been saved successfully", "Success!");
+        }
+        catch (Exception)
+        {
+            ToastService.ShowError("Something went wrong while saving your recipe", "Oh shit");
+        }
+
+    }
+
+    private async Task ShowConfirmationModal()
+    {
+        var parameters = new ModalParameters();
+        parameters.Add("RecipeId", Id);
+
+        var confirmationModal = Modal.Show<ConfirmationModal>("Delete recipe?", parameters);
+        var result = await confirmationModal.Result;
+
+        if(!result.Cancelled)
+        {
+            ToastService.ShowSuccess("Your recipe has been deleted!", "Success!");
+            NavigationManager.NavigateTo("/recipes");
+        }
+    }
+}
